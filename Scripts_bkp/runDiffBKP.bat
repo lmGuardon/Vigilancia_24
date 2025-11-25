@@ -1,8 +1,8 @@
 @ECHO OFF
 :: Script para ejecutar backups en SQL Express
 
-:: Configura aquí tu servidor (lo saqué de tu imagen)
+:: Configura aquí tu servidor
 SET SERVER=DESKTOP-FT9QSL0\SQLEXPRESS
 
-:: Si quieres correr el DIFF, usa este comando (descomenta quitando los ::)
+:: Si quieres correr el DIFF, usa este comando
 sqlcmd -S %SERVER% -E -i "C:\Data\Scripts\DiffBKP.sql"
