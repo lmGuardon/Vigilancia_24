@@ -4,8 +4,8 @@
 USE TanoSQL_Vigilancia24;
 GO
 
--- SP 1: Crear una nueva tarea y asignarla automáticamente
--- Justificación: Encapsula la lógica de negocio (crear + asignar) en una sola transacción.
+-- SP 1: Crear una nueva tarea y asignarla automï¿½ticamente
+-- Justificaciï¿½n: Encapsula la lï¿½gica de negocio (crear + asignar) en una sola transacciï¿½n.
 CREATE PROCEDURE sp_CreateTaskAndAssign
     @ProjectID INT,
     @Title NVARCHAR(200),
@@ -22,7 +22,6 @@ BEGIN
         -- 1. Insertar la tarea
         INSERT INTO subtasks (project_id, title, start_date, priority_id, status_id)
         VALUES (@ProjectID, @Title, GETDATE(), @PriorityID, 1); -- 1 = Pendiente
-
 
         SET @NewTaskID = SCOPE_IDENTITY();
 
@@ -42,9 +41,38 @@ BEGIN
 END;
 GO
 
+-- SP 2: Crear un nuevo proyecto
+-- Justificaciï¿½n: Encapsula la lï¿½gica de negocio (crear proyecto).
+CREATE PROCEDURE sp_CreateProyect
+    @Title NVARCHAR(200),
+    @Description NVARCHAR(1000),
+    @PriorityID INT,
+    @CreateBy INT,
+    @StatusID INT,
+    @EndDateEstimated DATETIME
+AS
+BEGIN
+    SET NOCOUNT ON;
 
--- SP 2: Completar Tarea
--- Justificación: Simplifica el cierre de tareas actualizando estado.
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- 1. Insertar el proyecto
+        INSERT INTO projects (name, description, created_by, priority_id, status_id, start_date, end_date_estimated)
+        VALUES (@Title, @Description, @CreateBy, @PriorityID, @StatusID, GETDATE(), @EndDateEstimated);
+
+        COMMIT TRANSACTION;
+        PRINT 'Proyecto creada exitosamente.';
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        PRINT 'Error al crear proyecto.';
+    END CATCH
+END;
+GO
+
+
+-- SP 3: Completar Tarea
+-- Justificaciï¿½n: Simplifica el cierre de tareas actualizando estado.
 CREATE PROCEDURE sp_CompleteTask
     @TaskID INT
 AS
