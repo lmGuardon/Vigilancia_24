@@ -82,3 +82,35 @@ BEGIN
     WHERE id = @TaskID;
 END;
 GO
+
+-- SP 4: Crear un nuevo usuario
+-- Justificaci�n: Encapsula la l�gica de negocio (crear usuarios).
+CREATE PROCEDURE sp_CreateUser
+    @Name NVARCHAR(100),
+    @Email NVARCHAR(255),
+    @Password NVARCHAR(255),
+    @Profile NVARCHAR(50),
+
+AS
+BEGIN
+    DECLARE @Profile_id INT;
+
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        
+        -- 0. Obtener el profile_id seg�n el nombre del perfil
+        SELECT @Profile_id = id FROM user_profiles WHERE role_name = @Profile;
+
+        -- 1. Insertar el usuario
+        INSERT INTO users (name, email, password_hash, profile_id, created_at)
+        VALUES (@Name, @Email, @Password, @Profile_id, GETDATE());
+
+        COMMIT TRANSACTION;
+        PRINT 'Usuario creado exitosamente.';
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        PRINT 'Error al crear un Usuario.';
+    END CATCH
+END;
+GO
