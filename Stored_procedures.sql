@@ -6,7 +6,7 @@ GO
 
 -- SP 1: Crear una nueva tarea y asignarla autom�ticamente
 -- Justificaci�n: Encapsula la l�gica de negocio (crear + asignar) en una sola transacci�n.
-CREATE PROCEDURE sp_CreateTaskAndAssign
+CREATE OR ALTER PROCEDURE sp_CreateTaskAndAssign
     @ProjectID INT,
     @Title NVARCHAR(200),
     @PriorityID INT,
@@ -43,7 +43,7 @@ GO
 
 -- SP 2: Crear un nuevo proyecto
 -- Justificaci�n: Encapsula la l�gica de negocio (crear proyecto).
-CREATE PROCEDURE sp_CreateProyect
+CREATE OR ALTER PROCEDURE sp_CreateProyect
     @Title NVARCHAR(200),
     @Description NVARCHAR(1000),
     @PriorityID INT,
@@ -73,7 +73,7 @@ GO
 
 -- SP 3: Completar Tarea
 -- Justificaci�n: Simplifica el cierre de tareas actualizando estado.
-CREATE PROCEDURE sp_CompleteTask
+CREATE OR ALTER PROCEDURE sp_CompleteTask
     @TaskID INT
 AS
 BEGIN
@@ -85,7 +85,7 @@ GO
 
 -- SP 4: Crear un nuevo usuario
 -- Justificaci�n: Encapsula la l�gica de negocio (crear usuarios).
-CREATE PROCEDURE sp_CreateUser
+CREATE OR ALTER PROCEDURE sp_CreateUser
     @Name NVARCHAR(100),
     @Email NVARCHAR(255),
     @Password NVARCHAR(255),
@@ -112,5 +112,23 @@ BEGIN
         ROLLBACK TRANSACTION;
         PRINT 'Error al crear un Usuario.';
     END CATCH
+END;
+GO
+
+-- SP 5: Mover Tarea a otro estado
+-- Justificaci�n: Facilita la actualizaci�n del estado de una tarea.
+CREATE OR ALTER PROCEDURE sp_MoveTask
+    @TaskID INT,
+    @NewStatusID INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- El trigger trg_Audit_Subtasks se encargará de auditar
+    -- usando el UserID que inyectaremos desde Python.
+    
+    UPDATE subtasks 
+    SET status_id = @NewStatusID
+    WHERE id = @TaskID;
 END;
 GO

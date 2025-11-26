@@ -6,7 +6,7 @@ GO
 
 -- Vista 1: Estado general de Proyectos con Nombres legibles
 -- Justificaci�n: Facilita la lectura para gerencia sin hacer JOINs repetitivos.
-CREATE VIEW vw_Projects_Status AS
+CREATE OR ALTER VIEW vw_Projects_Status AS
 SELECT 
     p.name AS Proyecto,
     u.name AS Creador,
@@ -22,7 +22,7 @@ GO
 
 -- Vista 2: Tareas Pendientes o En Progreso
 -- Justificaci�n: Panel operativo diario para los desarrolladores.
-CREATE VIEW vw_Active_Tasks AS
+CREATE OR ALTER VIEW vw_Active_Tasks AS
 SELECT 
     t.title AS Tarea,
     p.name AS Proyecto,
@@ -38,7 +38,7 @@ GO
 
 -- Vista 3: Tareas Finalizadas
 -- Justificaci�n: Panel operativo diario para los desarrolladores.
-CREATE VIEW vw_Completed_Tasks AS
+CREATE OR ALTER VIEW vw_Completed_Tasks AS
 SELECT 
     t.title AS Tarea,
     p.name AS Proyecto,
@@ -54,7 +54,7 @@ GO
 
 -- Vista 4: Usuarios y sus Perfiles
 -- Justificaci�n: Facilita la gesti�n de usuarios y roles.
-CREATE VIEW vw_Users_Profiles AS
+CREATE OR ALTER VIEW vw_Users_Profiles AS
 SELECT 
     u.name AS Usuario,
     u.email AS Email,
@@ -63,4 +63,31 @@ SELECT
 FROM users u
 JOIN user_profiles up ON u.profile_id = up.id;
 GO  
+
+USE TanoSQL_Vigilancia24;
+GO
+
+-- Vista 5: Tablero Kanban de Tareas
+-- Justificaci�n: Visualizaci�n tipo Kanban para gesti�n de tareas
+CREATE OR ALTER VIEW vw_Kanban_Board AS
+SELECT 
+    t.id AS TaskID,
+    t.title AS Titulo,
+    p.name AS Proyecto,          -- Usaremos esto como "Etiqueta" visual
+    pr.name AS Prioridad,
+    s.name AS Estado,
+    s.id AS StatusID,            -- Necesario para saber en qué columna ponerlo
+    
+    -- Truco para concatenar responsables (ej: "Juan, Pedro")
+    (SELECT STRING_AGG(u.name, ', ') 
+     FROM subtask_assignments sa 
+     JOIN users u ON sa.user_id = u.id 
+     WHERE sa.subtask_id = t.id) AS Responsables,
+
+    t.due_date AS FechaFin
+FROM subtasks t
+JOIN projects p ON t.project_id = p.id
+JOIN priorities pr ON t.priority_id = pr.id
+JOIN statuses s ON t.status_id = s.id;
+GO
 
