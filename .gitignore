@@ -1,0 +1,10 @@
+# Ignora la carpeta venv
+venv/
+# Ignora archivos .pyc
+*.pyc
+# Ignora archivos de configuración local
+config_local.json
+# Ignora archivos de base de datos SQLite
+*.sqlite3
+# Ignora archivos de log
+*.log   
