@@ -31,6 +31,14 @@ class State(rx.State):
         {"id": 4, "name": "Finalizado", "color": "green"},
     ]
 
+    # --- SETTERS (Para evitar el DeprecationWarning) ---
+    def set_email_input(self, val): self.email_input = val
+    def set_pass_input(self, val): self.pass_input = val
+    def set_new_name(self, val): self.new_name = val
+    def set_new_email(self, val): self.new_email = val
+    def set_new_pass(self, val): self.new_pass = val
+    def set_new_profile(self, val): self.new_profile = val
+
     # --- FUNCIONES DE LOGIN ---
     def login(self):
         with pyodbc.connect(CONN_STR) as conn:
@@ -109,13 +117,15 @@ def task_card(task: dict):
             rx.text(task["Titulo"], font_weight="bold", color="white", font_size="14px"),
             rx.text(f"Resp: {task['Responsables']}", font_size="11px", color="gray.500"),
             rx.hstack(
+                # AQUÍ ESTABA EL ERROR: Agregamos .to(int)
                 rx.cond(
-                    task["StatusID"] > 1,
+                    task["StatusID"].to(int) > 1,
                     rx.button("←", on_click=lambda: State.move_card(task["TaskID"], task["StatusID"] - 1), size="1", variant="surface"),
                 ),
                 rx.spacer(),
+                # AQUÍ TAMBIÉN: Agregamos .to(int)
                 rx.cond(
-                    task["StatusID"] < 4,
+                    task["StatusID"].to(int) < 4,
                     rx.button("→", on_click=lambda: State.move_card(task["TaskID"], task["StatusID"] + 1), size="1", variant="surface"),
                 ),
                 width="100%",
@@ -142,7 +152,8 @@ def kanban_column(column: dict):
         rx.foreach(
             State.tasks,
             lambda task: rx.cond(
-                task["StatusID"] == column["id"],
+                # AQUÍ TAMBIÉN: Aseguramos la comparación correcta
+                task["StatusID"].to(int) == column["id"].to(int),
                 task_card(task),
                 rx.fragment()
             )
