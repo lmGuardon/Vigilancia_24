@@ -52,4 +52,15 @@ JOIN priorities pr ON t.priority_id = pr.id
 WHERE s.name IN ('Finalizado');
 GO
 
+-- Vista 4: Usuarios y sus Perfiles
+-- Justificaci�n: Facilita la gesti�n de usuarios y roles.
+CREATE VIEW vw_Users_Profiles AS
+SELECT 
+    u.name AS Usuario,
+    u.email AS Email,
+    up.name AS Perfil,
+    u.created_at AS Fecha_Creacion
+FROM users u
+JOIN user_profiles up ON u.profile_id = up.id;
+GO  
 
