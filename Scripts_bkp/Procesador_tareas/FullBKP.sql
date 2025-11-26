@@ -1,5 +1,5 @@
 DECLARE @NombreBase NVARCHAR(50) = 'TanoSQL_Vigilancia24'
-DECLARE @RutaBase NVARCHAR(256) = 'C:\Data\BKP\'
+DECLARE @RutaBase NVARCHAR(256) = 'C:\Data\'
 DECLARE @NombreArchivo NVARCHAR(256)
 DECLARE @Fecha NVARCHAR(20)
 

@@ -58,7 +58,7 @@ CREATE VIEW vw_Users_Profiles AS
 SELECT 
     u.name AS Usuario,
     u.email AS Email,
-    up.name AS Perfil,
+    up.role_name AS Perfil,
     u.created_at AS Fecha_Creacion
 FROM users u
 JOIN user_profiles up ON u.profile_id = up.id;

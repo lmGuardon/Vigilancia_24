@@ -89,7 +89,7 @@ CREATE PROCEDURE sp_CreateUser
     @Name NVARCHAR(100),
     @Email NVARCHAR(255),
     @Password NVARCHAR(255),
-    @Profile NVARCHAR(50),
+    @Profile NVARCHAR(50)
 
 AS
 BEGIN
