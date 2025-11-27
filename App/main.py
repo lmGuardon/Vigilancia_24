@@ -192,12 +192,12 @@ def project_card(project: dict):
             rx.hstack(
                 rx.cond(
                     project["StatusID"].to(int) > 1,
-                    rx.button("←", on_click=lambda: State.move_project(project["ProjectID"], project["StatusID"] - 1), size="1", variant="surface"),
+                    rx.button("←", on_click=lambda: State.move_project(project["ProjectID"], project["StatusID"].to(int) - 1), size="1", variant="surface"),
                 ),
                 rx.spacer(),
                 rx.cond(
                     project["StatusID"].to(int) < 4,
-                    rx.button("→", on_click=lambda: State.move_project(project["ProjectID"], project["StatusID"] + 1), size="1", variant="surface"),
+                    rx.button("→", on_click=lambda: State.move_project(project["ProjectID"], project["StatusID"].to(int) + 1), size="1", variant="surface"),
                 ),
                 width="100%",
                 padding_top="5px"
