@@ -67,27 +67,46 @@ GO
 USE TanoSQL_Vigilancia24;
 GO
 
--- Vista 5: Tablero Kanban de Tareas
--- Justificaci�n: Visualizaci�n tipo Kanban para gesti�n de tareas
-CREATE OR ALTER VIEW vw_Kanban_Board AS
+-- 1. Asegurar que exista el estado 'Cancelado' para la lógica visual roja
+IF NOT EXISTS (SELECT * FROM statuses WHERE name = 'Cancelado')
+BEGIN
+    INSERT INTO statuses (name) VALUES ('Cancelado');
+END
+GO
+
+-- 5. VISTA PARA EL TABLERO (Proyectos)
+-- Muestra la info del proyecto y un resumen de progreso calculado al vuelo
+CREATE OR ALTER VIEW vw_Kanban_Projects AS
+SELECT 
+    p.id AS ProjectID,
+    p.name AS Titulo,
+    p.description AS Descripcion,
+    p.status_id AS StatusID,
+    s.name AS Estado,
+    s.name AS StatusName, -- Para usar en filtros
+    pr.name AS Prioridad,
+    u.name AS Leader,
+    -- Métricas simples para mostrar en la tarjeta
+    (SELECT COUNT(*) FROM subtasks WHERE project_id = p.id) AS TotalTareas,
+    (SELECT COUNT(*) FROM subtasks WHERE project_id = p.id AND status_id = (SELECT id FROM statuses WHERE name = 'Finalizado')) AS TareasCompletadas
+FROM projects p
+JOIN statuses s ON p.status_id = s.id
+JOIN priorities pr ON p.priority_id = pr.id
+JOIN users u ON p.created_by = u.id;
+GO
+
+-- 6 VISTA PARA EL POPUP (Detalle de Tareas)
+-- Lista simple filtrable por ProjectID
+CREATE OR ALTER VIEW vw_Project_Tasks_Detail AS
 SELECT 
     t.id AS TaskID,
+    t.project_id AS ProjectID,
     t.title AS Titulo,
-    p.name AS Proyecto,          -- Usaremos esto como "Etiqueta" visual
-    pr.name AS Prioridad,
     s.name AS Estado,
-    s.id AS StatusID,            -- Necesario para saber en qué columna ponerlo
-    
-    -- Truco para concatenar responsables (ej: "Juan, Pedro")
-    (SELECT STRING_AGG(u.name, ', ') 
-     FROM subtask_assignments sa 
-     JOIN users u ON sa.user_id = u.id 
-     WHERE sa.subtask_id = t.id) AS Responsables,
-
-    t.due_date AS FechaFin
+    pr.name AS Prioridad,
+    t.due_date AS Vencimiento
 FROM subtasks t
-JOIN projects p ON t.project_id = p.id
-JOIN priorities pr ON t.priority_id = pr.id
-JOIN statuses s ON t.status_id = s.id;
+JOIN statuses s ON t.status_id = s.id
+JOIN priorities pr ON t.priority_id = pr.id;
 GO
 
