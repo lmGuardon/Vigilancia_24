@@ -75,7 +75,6 @@ BEGIN
             THROW 51000, @ErrorMsg, 1;
         END
     END
-
     -- 2. Ejecución del Borrado (Si llegamos acá es porque pasó el check o @Confirm = 1)
     BEGIN TRANSACTION;
     BEGIN TRY
@@ -159,9 +158,18 @@ BEGIN
         -- Si el usuario creó proyectos, no podemos borrarlo por la FK.
         -- Solución: Reasignar la autoría al Admin (ID 1) o al usuario que está borrando.
         -- Asumiremos reasignar al ID 1 (Admin default) para mantener integridad.
-        UPDATE projects 
-        SET created_by = 1 
-        WHERE created_by = @TargetUserID;
+        IF (SELECT user_id FROM projects_members WHERE user_id = @TargetUserID) IS NOT NULL
+            BEGIN
+                UPDATE projects_members 
+                SET user_id = 0 
+                WHERE user_id = @TargetUserID;
+            END
+        IF (SELECT assigned_at FROM projects_members WHERE assigned_at = @TargetUserID) IS NOT NULL
+            BEGIN
+                UPDATE projects_members 
+                SET assigned_at = 0 
+                WHERE assigned_at = @TargetUserID;
+            END
 
         -- D. Borrar Usuario
         -- Dispara trg_Audit_Users

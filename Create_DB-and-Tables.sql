@@ -1,7 +1,15 @@
 -- =============================================
 -- 1. CREACI�N DE LA BASE DE DATOS Y TABLAS
 -- =============================================
-CREATE DATABASE TanoSQL_Vigilancia24;
+IF DB_ID('TanoSQL_Vigilancia24') IS NULL
+    BEGIN
+        CREATE DATABASE TanoSQL_Vigilancia24;
+        PRINT 'Base de datos creada exitosamente.';
+    END
+ELSE
+    BEGIN
+        PRINT 'La base de datos ya existe.';
+    END
 GO
 
 USE TanoSQL_Vigilancia24;
@@ -48,10 +56,10 @@ CREATE TABLE projects (
     description NVARCHAR(MAX),
     start_date DATE,
     end_date_estimated DATE,
-    created_by INT NOT NULL, -- Qui�n cre� el proyecto
+    --created_by INT NOT NULL, -- Qui�n cre� el proyecto
     status_id INT NOT NULL,
     priority_id INT NOT NULL,
-    CONSTRAINT FK_projects_users FOREIGN KEY (created_by) REFERENCES users(id),
+    --CONSTRAINT FK_projects_users FOREIGN KEY (created_by) REFERENCES users(id),
     CONSTRAINT FK_projects_status FOREIGN KEY (status_id) REFERENCES statuses(id),
     CONSTRAINT FK_projects_priority FOREIGN KEY (priority_id) REFERENCES priorities(id)
 );
@@ -62,10 +70,11 @@ CREATE TABLE projects (
 CREATE TABLE project_members (
     project_id INT NOT NULL,
     user_id INT NOT NULL,
-    assigned_at DATETIME DEFAULT GETDATE(),
+    assigned_at INT NOT NULL,
     PRIMARY KEY (project_id, user_id),
     CONSTRAINT FK_members_project FOREIGN KEY (project_id) REFERENCES projects(id),
-    CONSTRAINT FK_members_user FOREIGN KEY (user_id) REFERENCES users(id)
+    CONSTRAINT FK_create_user_project FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT FK_assigned_user_project FOREIGN KEY (assigned_at) REFERENCES users(id)
 );
 
 
@@ -90,9 +99,11 @@ CREATE TABLE subtasks (
 CREATE TABLE subtask_assignments (
     subtask_id INT NOT NULL,
     user_id INT NOT NULL,
+    assigned_at INT NOT NULL,
     PRIMARY KEY (subtask_id, user_id),
     CONSTRAINT FK_assign_subtask FOREIGN KEY (subtask_id) REFERENCES subtasks(id),
-    CONSTRAINT FK_assign_user FOREIGN KEY (user_id) REFERENCES users(id)
+    CONSTRAINT FK_create_user_subtask FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT FK_assigned_user_subtask FOREIGN KEY (assigned_at) REFERENCES users(id)
 );
 GO
 

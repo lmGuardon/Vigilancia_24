@@ -16,7 +16,7 @@ INSERT INTO priorities (name) VALUES ('Baja'), ('Media'), ('Alta'), ('Crítica');
 
 
 -- Insertar Estados
-INSERT INTO statuses (name) VALUES ('Pendiente'), ('En Progreso'), ('QA / Testing'), ('Finalizado');
+INSERT INTO statuses (name) VALUES ('Pendiente'), ('En Progreso'), ('QA / Testing'), ('Finalizado'), ('Cancelado');
 
 
 -- Insertar Usuarios (Basado en el PDF)

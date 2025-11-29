@@ -10,11 +10,14 @@ CREATE OR ALTER VIEW vw_Projects_Status AS
 SELECT 
     p.name AS Proyecto,
     u.name AS Creador,
+    u2.name AS Asignado,
     s.name AS Estado,
     pr.name AS Prioridad,
     p.end_date_estimated AS Fecha_Fin_Estimada
 FROM projects p
-JOIN users u ON p.created_by = u.id
+JOIN project_members pm ON p.id = pm.project_id
+JOIN users u ON pm.user_id = u.id
+JOIN users u2 ON pm.assigned_at = u2.id
 JOIN statuses s ON p.status_id = s.id
 JOIN priorities pr ON p.priority_id = pr.id;
 GO
@@ -64,7 +67,7 @@ FROM users u
 JOIN user_profiles up ON u.profile_id = up.id;
 GO  
 
-USE TanoSQL_Vigilancia24;
+/*USE TanoSQL_Vigilancia24;
 GO
 
 -- 1. Asegurar que exista el estado 'Cancelado' para la lógica visual roja
@@ -72,7 +75,7 @@ IF NOT EXISTS (SELECT * FROM statuses WHERE name = 'Cancelado')
 BEGIN
     INSERT INTO statuses (name) VALUES ('Cancelado');
 END
-GO
+GO*/
 
 -- 5. VISTA PARA EL TABLERO (Proyectos)
 -- Muestra la info del proyecto y un resumen de progreso calculado al vuelo
@@ -92,7 +95,8 @@ SELECT
 FROM projects p
 JOIN statuses s ON p.status_id = s.id
 JOIN priorities pr ON p.priority_id = pr.id
-JOIN users u ON p.created_by = u.id;
+JOIN project_members pm ON p.id = pm.project_id
+JOIN users u ON pm.user_id = u.id;
 GO
 
 -- 6 VISTA PARA EL POPUP (Detalle de Tareas)

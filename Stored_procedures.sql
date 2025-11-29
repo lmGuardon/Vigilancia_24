@@ -6,29 +6,34 @@ GO
 
 -- SP 1: Crear una nueva tarea y asignarla autom�ticamente
 -- Justificaci�n: Encapsula la l�gica de negocio (crear + asignar) en una sola transacci�n.
-CREATE OR ALTER PROCEDURE sp_CreateTaskAndAssign
+CREATE OR ALTER PROCEDURE sp_CreateTask
     @ProjectID INT,
     @Title NVARCHAR(200),
+    @Description NVARCHAR(1000),
+    @EndDateEstimated DATETIME,
     @PriorityID INT,
+    @CreateBy INT,
     @AssignedUserID INT
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @NewTaskID INT;
 
+    -- 1. Obtener el usuario real (si es NULL, ponemos 0 o un ID de sistema)
+    SET @CreateBy = ISNULL(CAST(SESSION_CONTEXT(N'UserID') AS INT), 0);
 
     BEGIN TRANSACTION;
     BEGIN TRY
         -- 1. Insertar la tarea
-        INSERT INTO subtasks (project_id, title, start_date, priority_id, status_id)
-        VALUES (@ProjectID, @Title, GETDATE(), @PriorityID, 1); -- 1 = Pendiente
+        INSERT INTO subtasks (project_id, title, description, start_date, due_date, priority_id, status_id)
+        VALUES (@ProjectID, @Title, @Description, GETDATE(), @EndDateEstimated, @PriorityID, 1); -- 1 = Pendiente
 
         SET @NewTaskID = SCOPE_IDENTITY();
 
 
         -- 2. Asignar el usuario
-        INSERT INTO subtask_assignments (subtask_id, user_id)
-        VALUES (@NewTaskID, @AssignedUserID);
+        INSERT INTO subtask_assignments (subtask_id, user_id, assigned_at)
+        VALUES (@NewTaskID, @CreateBy, @AssignedUserID);
 
 
         COMMIT TRANSACTION;
@@ -43,22 +48,32 @@ GO
 
 -- SP 2: Crear un nuevo proyecto
 -- Justificaci�n: Encapsula la l�gica de negocio (crear proyecto).
-CREATE OR ALTER PROCEDURE sp_CreateProyect
+CREATE OR ALTER PROCEDURE sp_CreateProject
     @Title NVARCHAR(200),
     @Description NVARCHAR(1000),
     @PriorityID INT,
     @CreateBy INT,
-    @StatusID INT,
+    @AssignedUserID INT,
     @EndDateEstimated DATETIME
 AS
 BEGIN
     SET NOCOUNT ON;
+    DECLARE @NewProjectID INT;
+
+    -- 1. Obtener el usuario real (si es NULL, ponemos 0 o un ID de sistema)
+    SET @CreateBy = ISNULL(CAST(SESSION_CONTEXT(N'UserID') AS INT), 0);
 
     BEGIN TRANSACTION;
     BEGIN TRY
         -- 1. Insertar el proyecto
-        INSERT INTO projects (name, description, created_by, priority_id, status_id, start_date, end_date_estimated)
-        VALUES (@Title, @Description, @CreateBy, @PriorityID, @StatusID, GETDATE(), @EndDateEstimated);
+        INSERT INTO projects (name, description, priority_id, status_id, start_date, end_date_estimated)
+        VALUES (@Title, @Description, @PriorityID, 1, GETDATE(), @EndDateEstimated);
+
+        SET @NewProjectID = SCOPE_IDENTITY();
+
+        -- 2. Asignar el usuario
+        INSERT INTO project_members (project_id, user_id, assigned_at)
+        VALUES (@NewProjectID, @CreateBy, @AssignedUserID);
 
         COMMIT TRANSACTION;
         PRINT 'Proyecto creada exitosamente.';
