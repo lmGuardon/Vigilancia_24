@@ -116,6 +116,18 @@ BEGIN
 
     DECLARE @ActiveAssignmentsCount INT;
     DECLARE @ErrorMsg NVARCHAR(200);
+    DECLARE @IsAdmin BIT;
+    
+    -- Verificar si el usuario a borrar es Admin
+    SELECT @IsAdmin = CASE WHEN up.role_name = 'Administrador' THEN 1 ELSE 0 END
+    FROM users u
+    JOIN user_profiles up ON u.profile_id = up.id
+    WHERE u.id = @AdminUserID;
+    
+    IF @IsAdmin = 0
+    BEGIN  
+        THROW 51001, 'Solo un Administrador puede borrar usuarios.', 1;
+    END
 
     -- 1. Validaciones
     IF @Confirm = 0
@@ -148,28 +160,32 @@ BEGIN
     -- 2. Ejecución
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- A. Desasignar de Tareas (Dejar "sin personal asignado")
-        DELETE FROM subtask_assignments WHERE user_id = @TargetUserID;
-
-        -- B. Desasignar de Proyectos
-        DELETE FROM project_members WHERE user_id = @TargetUserID;
-
-        -- C. IMPORTANTE: Manejo de Foreign Key 'created_by' en Projects
+        -- A. IMPORTANTE: Manejo de Foreign Key 'created_by' en Projects
         -- Si el usuario creó proyectos, no podemos borrarlo por la FK.
         -- Solución: Reasignar la autoría al Admin (ID 1) o al usuario que está borrando.
         -- Asumiremos reasignar al ID 1 (Admin default) para mantener integridad.
-        IF (SELECT user_id FROM projects_members WHERE user_id = @TargetUserID) IS NOT NULL
+        IF EXISTS (SELECT user_id FROM project_members WHERE user_id = @TargetUserID)
             BEGIN
-                UPDATE projects_members 
-                SET user_id = 0 
+                UPDATE project_members 
+                SET user_id = (SELECT id FROM users WHERE name = 'Super Admin') 
                 WHERE user_id = @TargetUserID;
+                
+                DELETE FROM subtask_assignments WHERE user_id = @TargetUserID;
             END
-        IF (SELECT assigned_at FROM projects_members WHERE assigned_at = @TargetUserID) IS NOT NULL
+        IF EXISTS (SELECT assigned_id FROM project_members WHERE assigned_id = @TargetUserID)
             BEGIN
-                UPDATE projects_members 
-                SET assigned_at = 0 
-                WHERE assigned_at = @TargetUserID;
+                UPDATE project_members 
+                SET assigned_id = (SELECT id FROM users WHERE name = 'Super Admin')
+                WHERE assigned_id = @TargetUserID;
+                
+                DELETE FROM project_members WHERE user_id = @TargetUserID;
             END
+        
+        -- B. Desasignar de Tareas (Dejar "sin personal asignado")
+        --DELETE FROM subtask_assignments WHERE user_id = @TargetUserID;
+
+        -- C. Desasignar de Proyectos
+        --DELETE FROM project_members WHERE user_id = @TargetUserID;
 
         -- D. Borrar Usuario
         -- Dispara trg_Audit_Users
