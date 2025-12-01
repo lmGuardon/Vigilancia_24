@@ -18,30 +18,27 @@ AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @NewTaskID INT;
-
-    -- 1. Obtener el usuario real (si es NULL, ponemos 0 o un ID de sistema)
-    SET @CreateBy = ISNULL(CAST(SESSION_CONTEXT(N'UserID') AS INT), 0);
+    
+    DECLARE @RealAssigner INT = ISNULL(CAST(SESSION_CONTEXT(N'UserID') AS INT), @CreateBy);
+    IF @RealAssigner = 0 SET @RealAssigner = 1;
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- 1. Insertar la tarea
         INSERT INTO subtasks (project_id, title, description, start_date, due_date, priority_id, status_id)
-        VALUES (@ProjectID, @Title, @Description, GETDATE(), @EndDateEstimated, @PriorityID, 1); -- 1 = Pendiente
+        VALUES (@ProjectID, @Title, @Description, GETDATE(), @EndDateEstimated, @PriorityID, 1);
 
         SET @NewTaskID = SCOPE_IDENTITY();
 
-
-        -- 2. Asignar el usuario
-        INSERT INTO subtask_assignments (subtask_id, user_id, assigned_at)
-        VALUES (@NewTaskID, @CreateBy, @AssignedUserID);
-
+        -- user_id = El dev asignado
+        -- assigned_id = El PM/Admin que asigna
+        INSERT INTO subtask_assignments (subtask_id, user_id, assigned_id, assignment_date)
+        VALUES (@NewTaskID, @AssignedUserID, @RealAssigner, GETDATE());
 
         COMMIT TRANSACTION;
-        PRINT 'Tarea creada y asignada exitosamente.';
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        PRINT 'Error al crear la tarea.';
+        THROW;
     END CATCH
 END;
 GO
@@ -52,35 +49,37 @@ CREATE OR ALTER PROCEDURE sp_CreateProject
     @Title NVARCHAR(200),
     @Description NVARCHAR(1000),
     @PriorityID INT,
-    @CreateBy INT,
-    @AssignedUserID INT,
+    @CreateBy INT,        -- Admin/Creador (Usuario logueado)
+    @AssignedUserID INT,  -- PM/Líder asignado
     @EndDateEstimated DATETIME
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @NewProjectID INT;
 
-    -- 1. Obtener el usuario real (si es NULL, ponemos 0 o un ID de sistema)
-    SET @CreateBy = ISNULL(CAST(SESSION_CONTEXT(N'UserID') AS INT), 0);
+    -- Obtenemos quién está ejecutando esto realmente
+    DECLARE @RealCreator INT = ISNULL(CAST(SESSION_CONTEXT(N'UserID') AS INT), @CreateBy);
+    IF @RealCreator = 0 SET @RealCreator = 1;
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- 1. Insertar el proyecto
-        INSERT INTO projects (name, description, priority_id, status_id, start_date, end_date_estimated)
-        VALUES (@Title, @Description, @PriorityID, 1, GETDATE(), @EndDateEstimated);
+        -- A. Insertar Proyecto
+        INSERT INTO projects (name, description, priority_id, status_id, start_date, end_date_estimated, created_by)
+        VALUES (@Title, @Description, @PriorityID, 1, GETDATE(), @EndDateEstimated, @RealCreator);
 
         SET @NewProjectID = SCOPE_IDENTITY();
 
-        -- 2. Asignar el usuario
-        INSERT INTO project_members (project_id, user_id, assigned_at)
-        VALUES (@NewProjectID, @CreateBy, @AssignedUserID);
+        -- B. Asignar Miembro
+        -- user_id = @AssignedUserID (El PM)
+        -- assigned_id = @RealCreator (El que creó el proyecto)
+        INSERT INTO project_members (project_id, user_id, assigned_id, assignment_date)
+        VALUES (@NewProjectID, @AssignedUserID, @RealCreator, GETDATE());
 
         COMMIT TRANSACTION;
-        PRINT 'Proyecto creada exitosamente.';
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        PRINT 'Error al crear proyecto.';
+        THROW;
     END CATCH
 END;
 GO

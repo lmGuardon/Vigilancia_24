@@ -56,10 +56,10 @@ CREATE TABLE projects (
     description NVARCHAR(MAX),
     start_date DATE,
     end_date_estimated DATE,
-    --created_by INT NOT NULL, -- Qui�n cre� el proyecto
+    created_by INT NOT NULL, -- Qui�n cre� el proyecto
     status_id INT NOT NULL,
     priority_id INT NOT NULL,
-    --CONSTRAINT FK_projects_users FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT FK_projects_users FOREIGN KEY (created_by) REFERENCES users(id),
     CONSTRAINT FK_projects_status FOREIGN KEY (status_id) REFERENCES statuses(id),
     CONSTRAINT FK_projects_priority FOREIGN KEY (priority_id) REFERENCES priorities(id)
 );
@@ -69,13 +69,16 @@ CREATE TABLE projects (
 -- Permite que un proyecto tenga m�ltiples colaboradores
 CREATE TABLE project_members (
     project_id INT NOT NULL,
-    user_id INT NOT NULL,
-    assigned_at INT NOT NULL,
+    user_id INT NOT NULL,        -- Usuario Miembro (Asignado)
+    assigned_id INT NOT NULL,    -- Usuario que Asigna (Tu corrección)
+    assignment_date DATETIME DEFAULT GETDATE(), -- Fecha de asignación (Nuevo)
+    
     PRIMARY KEY (project_id, user_id),
     CONSTRAINT FK_members_project FOREIGN KEY (project_id) REFERENCES projects(id),
-    CONSTRAINT FK_create_user_project FOREIGN KEY (user_id) REFERENCES users(id),
-    CONSTRAINT FK_assigned_user_project FOREIGN KEY (assigned_at) REFERENCES users(id)
+    CONSTRAINT FK_members_user FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT FK_members_assigner FOREIGN KEY (assigned_id) REFERENCES users(id) -- FK al usuario asignador
 );
+GO
 
 
 -- Tabla de Subtareas / Tickets
@@ -99,11 +102,13 @@ CREATE TABLE subtasks (
 CREATE TABLE subtask_assignments (
     subtask_id INT NOT NULL,
     user_id INT NOT NULL,
-    assigned_at INT NOT NULL,
+    assigned_id INT NOT NULL,    -- Usuario que asigna
+    assignment_date DATETIME DEFAULT GETDATE(),
+    
     PRIMARY KEY (subtask_id, user_id),
     CONSTRAINT FK_assign_subtask FOREIGN KEY (subtask_id) REFERENCES subtasks(id),
-    CONSTRAINT FK_create_user_subtask FOREIGN KEY (user_id) REFERENCES users(id),
-    CONSTRAINT FK_assigned_user_subtask FOREIGN KEY (assigned_at) REFERENCES users(id)
+    CONSTRAINT FK_assign_user FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT FK_assign_assigner FOREIGN KEY (assigned_id) REFERENCES users(id)
 );
 GO
 

@@ -9,15 +9,15 @@ GO
 CREATE OR ALTER VIEW vw_Projects_Status AS
 SELECT 
     p.name AS Proyecto,
-    u.name AS Creador,
-    u2.name AS Asignado,
+    u_creator.name AS Creador,    
+    u_assigned.name AS Lider,     
     s.name AS Estado,
     pr.name AS Prioridad,
     p.end_date_estimated AS Fecha_Fin_Estimada
 FROM projects p
-JOIN project_members pm ON p.id = pm.project_id
-JOIN users u ON pm.user_id = u.id
-JOIN users u2 ON pm.assigned_at = u2.id
+LEFT JOIN users u_creator ON p.created_by = u_creator.id
+LEFT JOIN project_members pm ON p.id = pm.project_id
+LEFT JOIN users u_assigned ON pm.user_id = u_assigned.id
 JOIN statuses s ON p.status_id = s.id
 JOIN priorities pr ON p.priority_id = pr.id;
 GO
