@@ -1,8 +1,8 @@
 # **🛡️ Vigilancia 24 \- Sistema de Gestión de Proyectos**
 
-Este repositorio contiene el desarrollo de un sistema de gestión de proyectos y tareas (estilo ClickUp simplificado) para la empresa de consultoría IT **Vigilancia 24**.
+Este repositorio contiene el desarrollo de un sistema de gestión de proyectos y tareas (estilo ClickUp simplificado) para la empresa de monitoreo mayorista de alarmas **Vigilancia 24**.
 
-El proyecto incluye el diseño y creación de una base de datos relacional robusta en **SQL Server** y un aplicativo web frontend desarrollado en **Python (Reflex)**.
+El proyecto incluye el diseño y creación de una base de datos relacional robusta en **SQL Server** y un aplicativo web frontend desarrollado en **Python (Reflex)**. Este ultimó como un agregado extra.
 
 ## **🚀 Tecnologías Utilizadas**
 
@@ -25,14 +25,12 @@ Para ejecutar este proyecto localmente necesitas tener instalado:
 
 Navega a la carpeta Database (o donde tengas los scripts) y ejecútalos en tu SQL Server Management Studio (SSMS) en el siguiente **orden estricto** para evitar errores de dependencias:
 
-1. Create\_DB-and-Tables.sql \- Crea la DB y la estructura de tablas.  
-2. Fix\_Vigilancia\_Final.sql \- **IMPORTANTE**: Aplica correcciones de estructura y claves foráneas.  
-3. Triggers.sql \- Instala el sistema de auditoría.  
-4. Stored\_procedures.sql \- Crea los procedimientos de creación (Altas).  
-5. Stored\_procedures\_Deletes.sql \- Crea los procedimientos de eliminación lógica (Bajas).  
-6. Update\_Tasks\_Audit.sql \- Actualiza la lógica de seguridad para tareas.  
-7. Views.sql \- Crea las vistas para los reportes y el tablero Kanban.  
-8. Mock\_data.sql \- (Opcional) Carga datos de prueba iniciales.
+1. Create\_DB-and-Tables.sql \- Crea la DB y la estructura de tablas.    
+2. Triggers.sql \- Instala el sistema de auditoría.  
+3. Stored\_procedures.sql \- Crea los procedimientos de creación (Altas).  
+4. Stored\_procedures\_Deletes.sql \- Crea los procedimientos de eliminación lógica (Bajas).    
+5. Views.sql \- Crea las vistas para los reportes y el tablero Kanban.  
+6. Mock\_data.sql \- (Opcional) Carga datos de prueba iniciales.
 
 ### **2\. Configuración del Aplicativo Web (Reflex)**
 
@@ -77,7 +75,7 @@ Puedes iniciar sesión con cualquiera de estos usuarios para probar los diferent
 ## **📂 Estructura del Repositorio**
 
 /  
-├── Database/               \# Scripts SQL  
+├── SQL/               \# Scripts SQL  
 │   ├── Create\_DB...sql  
 │   ├── Stored\_procedures...sql  
 │   └── ...  
@@ -89,6 +87,6 @@ Puedes iniciar sesión con cualquiera de estos usuarios para probar los diferent
 
 ## **🎓 Contexto Académico**
 
-Materia: Administración de Bases de Datos  
+Materia: Administración de Bases de Datos - ISTEA  
 Año: 2025  
-Desarrollado por: Lucas Guardon
+Desarrollado por: Maximiliano Juarez y Lucas M. Guardon
