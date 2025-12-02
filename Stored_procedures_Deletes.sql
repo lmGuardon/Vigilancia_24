@@ -6,30 +6,57 @@ GO
 -- =============================================
 CREATE OR ALTER PROCEDURE sp_DeleteTask
     @TaskID INT,
-    @UserID INT -- Para el Session Context (Auditoría)
+    @UserID INT,      -- Usuario que ejecuta (para auditoría)
+    @Confirm BIT = 0  -- 0: Verificar Estado / 1: Forzar Borrado
 AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- 1. Inyectar UserID para el Trigger de Auditoría
-    -- Si el trigger de 'subtasks' intenta leer SESSION_CONTEXT, lo encontrará.
+    -- 0. Contexto de Auditoría
     EXEC sp_set_session_context 'UserID', @UserID;
 
+    DECLARE @TaskStatus NVARCHAR(50);
+    DECLARE @TaskTitle NVARCHAR(200);
+    DECLARE @ErrorMsg NVARCHAR(200);
+
+    -- 1. Validaciones (Solo si @Confirm = 0)
+    IF @Confirm = 0
+    BEGIN
+        -- Obtenemos estado y título de la tarea
+        SELECT @TaskStatus = s.name, @TaskTitle = t.title
+        FROM subtasks t
+        JOIN statuses s ON t.status_id = s.id
+        WHERE t.id = @TaskID;
+
+        -- Si no existe la tarea, salimos
+        IF @TaskStatus IS NULL
+        BEGIN;
+            THROW 51004, 'Error: La tarea especificada no existe.', 1;
+        END
+
+        -- Validar si está activa (No Finalizada ni Cancelada)
+        IF @TaskStatus NOT IN ('Finalizado', 'Cancelado')
+        BEGIN
+            SET @ErrorMsg = CONCAT('ADVERTENCIA: La tarea "', @TaskTitle, '" se encuentra en estado ', @TaskStatus, 
+                                   '. Ejecute con @Confirm=1 para proceder.');
+            THROW 51000, @ErrorMsg, 1;
+        END
+    END
+
+    -- 2. Ejecución
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- A. Eliminar asignaciones (Tabla intermedia N:M)
-        -- No requiere confirmación especial según requerimiento
+        -- A. Eliminar asignaciones (Tabla intermedia)
         DELETE FROM subtask_assignments WHERE subtask_id = @TaskID;
 
-        -- B. Eliminar la tarea
-        -- Al ejecutar este DELETE, se disparará automáticamente el Trigger trg_Audit_Subtasks
+        -- B. Eliminar la tarea (Dispara Trigger trg_Audit_Subtasks)
         DELETE FROM subtasks WHERE id = @TaskID;
 
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
-        THROW; -- Relanzar error para que Reflex se entere
+        THROW;
     END CATCH
 END;
 GO
@@ -106,89 +133,124 @@ GO
 -- 3. ELIMINAR USUARIO (Con Lógica de Advertencia y Reasignación)
 -- =============================================
 CREATE OR ALTER PROCEDURE sp_DeleteUser
-    @TargetUserID INT, -- Usuario a borrar
-    @AdminUserID INT,  -- Quien ejecuta la acción (para auditoría)
-    @Confirm BIT = 0
+    @TargetUserID INT,         -- Usuario a eliminar
+    @AdminUserID INT,          -- Quien ejecuta (Auditoría)
+    @Confirm BIT = 0,          -- 0: Solo chequear / 1: Ejecutar
+    @HeirUserID INT = NULL     -- (Opcional) ID del usuario que heredará la carga
 AS
 BEGIN
     SET NOCOUNT ON;
+    
+    -- 0. Contexto para Triggers existentes
     EXEC sp_set_session_context 'UserID', @AdminUserID;
 
     DECLARE @ActiveAssignmentsCount INT;
     DECLARE @ErrorMsg NVARCHAR(200);
     DECLARE @IsAdmin BIT;
+    DECLARE @TargetUserName NVARCHAR(100);
+    DECLARE @HeirUserName NVARCHAR(100);
+
+    -- Obtener nombre del usuario a borrar para el log
+    SELECT @TargetUserName = name FROM users WHERE id = @TargetUserID;
     
-    -- Verificar si el usuario a borrar es Admin
+    -- 1. Seguridad: Verificar si quien ejecuta es Admin
     SELECT @IsAdmin = CASE WHEN up.role_name = 'Administrador' THEN 1 ELSE 0 END
     FROM users u
     JOIN user_profiles up ON u.profile_id = up.id
     WHERE u.id = @AdminUserID;
     
-    IF @IsAdmin = 0
-    BEGIN  
+    IF @IsAdmin = 0 OR @IsAdmin IS NULL
         THROW 51001, 'Solo un Administrador puede borrar usuarios.', 1;
+
+    -- 2. Definir Heredero (Prioridad: Parámetro -> Automático)
+    IF @HeirUserID IS NULL
+    BEGIN
+        -- Buscar otro admin disponible automáticamente
+        SELECT TOP 1 @HeirUserID = id FROM users WHERE profile_id = 1 AND id <> @TargetUserID;
     END
 
-    -- 1. Validaciones
+    -- Validar Heredero Final
+    IF @HeirUserID IS NULL OR @HeirUserID = @TargetUserID
+        THROW 51002, 'Error: Debe especificar un usuario heredero válido (diferente al usuario a eliminar).', 1;
+
+    -- Obtener nombre del heredero para el log
+    SELECT @HeirUserName = name FROM users WHERE id = @HeirUserID;
+
+    -- 3. Advertencia (Preview)
     IF @Confirm = 0
     BEGIN
-        -- Contar en cuántos proyectos o tareas ACTIVAS está el usuario
-        -- (Sumamos tareas activas + proyectos activos donde sea miembro)
         SELECT @ActiveAssignmentsCount = 
-            (
-                SELECT COUNT(*) 
-                FROM subtask_assignments sa
-                JOIN subtasks t ON sa.subtask_id = t.id
-                JOIN statuses s ON t.status_id = s.id
-                WHERE sa.user_id = @TargetUserID AND s.name NOT IN ('Finalizado', 'Cancelado')
-            ) + (
-                SELECT COUNT(*)
-                FROM project_members pm
-                JOIN projects p ON pm.project_id = p.id
-                JOIN statuses s ON p.status_id = s.id
-                WHERE pm.user_id = @TargetUserID AND s.name NOT IN ('Finalizado', 'Cancelado')
-            );
+            (SELECT COUNT(*) FROM subtask_assignments sa
+             JOIN subtasks t ON sa.subtask_id = t.id
+             JOIN statuses s ON t.status_id = s.id
+             WHERE sa.user_id = @TargetUserID AND s.name NOT IN ('Finalizado', 'Cancelado')) 
+            + 
+            (SELECT COUNT(*) FROM project_members pm
+             JOIN projects p ON pm.project_id = p.id
+             JOIN statuses s ON p.status_id = s.id
+             WHERE pm.user_id = @TargetUserID AND s.name NOT IN ('Finalizado', 'Cancelado'));
 
         IF @ActiveAssignmentsCount > 0
         BEGIN
-            SET @ErrorMsg = CONCAT('ADVERTENCIA: El usuario tiene asignaciones en ', 
-                                   @ActiveAssignmentsCount, ' items activos (Proyectos o Tareas).');
+            SET @ErrorMsg = CONCAT('ADVERTENCIA: El usuario tiene ', @ActiveAssignmentsCount, 
+                                   ' asignaciones activas. Se reasignarán a: ', @HeirUserName, 
+                                   ' (ID: ', @HeirUserID, '). Confirme para proceder.');
             THROW 51000, @ErrorMsg, 1;
         END
     END
 
-    -- 2. Ejecución
+    -- 4. Ejecución Transaccional
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- A. IMPORTANTE: Manejo de Foreign Key 'created_by' en Projects
-        -- Si el usuario creó proyectos, no podemos borrarlo por la FK.
-        -- Solución: Reasignar la autoría al Admin (ID 1) o al usuario que está borrando.
-        -- Asumiremos reasignar al ID 1 (Admin default) para mantener integridad.
-        IF EXISTS (SELECT user_id FROM project_members WHERE user_id = @TargetUserID)
-            BEGIN
-                UPDATE project_members 
-                SET user_id = (SELECT id FROM users WHERE name = 'Super Admin') 
-                WHERE user_id = @TargetUserID;
-                
-                DELETE FROM subtask_assignments WHERE user_id = @TargetUserID;
-            END
-        IF EXISTS (SELECT assigned_id FROM project_members WHERE assigned_id = @TargetUserID)
-            BEGIN
-                UPDATE project_members 
-                SET assigned_id = (SELECT id FROM users WHERE name = 'Super Admin')
-                WHERE assigned_id = @TargetUserID;
-                
-                DELETE FROM project_members WHERE user_id = @TargetUserID;
-            END
         
-        -- B. Desasignar de Tareas (Dejar "sin personal asignado")
-        --DELETE FROM subtask_assignments WHERE user_id = @TargetUserID;
+        -- LOG DE INICIO DE TRASPASO
+        INSERT INTO audit_logs (table_name, action_type, record_id, real_user_id, changes_summary)
+        VALUES ('users', 'MIGRATION', @TargetUserID, @AdminUserID, 
+                CONCAT('Iniciando traspaso de responsabilidades de ', @TargetUserName, ' hacia ', @HeirUserName));
 
-        -- C. Desasignar de Proyectos
-        --DELETE FROM project_members WHERE user_id = @TargetUserID;
+        -- A. Reasignar PROYECTOS CREADOS (projects.created_by)
+        UPDATE projects 
+        SET created_by = @HeirUserID 
+        WHERE created_by = @TargetUserID;
 
-        -- D. Borrar Usuario
-        -- Dispara trg_Audit_Users
+        -- B. Reasignar MIEMBROS DE PROYECTOS (project_members.user_id)
+        -- Estrategia: Transferir si no existe, borrar si ya existe (Merge)
+        UPDATE pm
+        SET user_id = @HeirUserID
+        FROM project_members pm
+        WHERE pm.user_id = @TargetUserID
+          AND NOT EXISTS (
+              SELECT 1 FROM project_members check_pm 
+              WHERE check_pm.project_id = pm.project_id AND check_pm.user_id = @HeirUserID
+          );
+        -- Borrar remanentes (donde el heredero ya estaba)
+        DELETE FROM project_members WHERE user_id = @TargetUserID;
+
+        -- C. Reasignar HISTORIAL DE ASIGNACIONES (assigned_id) en Proyectos
+        UPDATE project_members 
+        SET assigned_id = @HeirUserID 
+        WHERE assigned_id = @TargetUserID;
+
+
+        -- D. Reasignar MIEMBROS DE TAREAS (subtask_assignments.user_id)
+        UPDATE sa
+        SET user_id = @HeirUserID
+        FROM subtask_assignments sa
+        WHERE sa.user_id = @TargetUserID
+          AND NOT EXISTS (
+              SELECT 1 FROM subtask_assignments check_sa 
+              WHERE check_sa.subtask_id = sa.subtask_id AND check_sa.user_id = @HeirUserID
+          );
+        DELETE FROM subtask_assignments WHERE user_id = @TargetUserID;
+
+        -- E. Reasignar HISTORIAL DE ASIGNACIONES (assigned_id) en Tareas
+        UPDATE subtask_assignments 
+        SET assigned_id = @HeirUserID 
+        WHERE assigned_id = @TargetUserID;
+
+
+        -- F. Borrar Usuario
+        -- Esto disparará el Trigger trg_Audit_Users automáticamente
         DELETE FROM users WHERE id = @TargetUserID;
 
         COMMIT TRANSACTION;

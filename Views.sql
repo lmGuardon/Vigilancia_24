@@ -114,3 +114,31 @@ JOIN statuses s ON t.status_id = s.id
 JOIN priorities pr ON t.priority_id = pr.id;
 GO
 
+-- 7 VISTA DE LOGS DE AUDITORÍA LEGIBLES
+-- Justificación: Facilita la revisión de auditoría por parte de administradores.
+CREATE OR ALTER VIEW vw_Audit_Logs_Readable AS
+SELECT 
+    al.log_id,
+    al.change_date AS Fecha,
+    
+    -- Traducir la tabla a nombre amigable
+    CASE al.table_name
+        WHEN 'users' THEN 'Usuarios'
+        WHEN 'projects' THEN 'Proyectos'
+        WHEN 'subtasks' THEN 'Tareas'
+        ELSE al.table_name
+    END AS Modulo,
+
+    al.action_type AS Accion,
+    
+    -- Mostrar Nombre del usuario en lugar del ID
+    -- Usamos ISNULL por si el usuario fue borrado físicamente (aunque no debería pasar con tu lógica actual)
+    ISNULL(u.name, 'Usuario Sistema') AS Responsable,
+    
+    al.changes_summary AS Detalle,
+    al.record_id AS ID_Registro_Afectado
+
+FROM audit_logs al
+LEFT JOIN users u ON al.real_user_id = u.id;
+GO
+

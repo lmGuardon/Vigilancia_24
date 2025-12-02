@@ -1,3 +1,9 @@
+assets/external/
+.web
+.states
+*.db
+__pycache__/
+*.py[cod]
 # Ignora la carpeta venv
 venv/
 # Ignora archivos .pyc
@@ -7,4 +13,4 @@ config_local.json
 # Ignora archivos de base de datos SQLite
 *.sqlite3
 # Ignora archivos de log
-*.log   
+*.log

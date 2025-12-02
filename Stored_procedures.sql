@@ -24,15 +24,22 @@ BEGIN
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        INSERT INTO subtasks (project_id, title, description, start_date, due_date, priority_id, status_id)
-        VALUES (@ProjectID, @Title, @Description, GETDATE(), @EndDateEstimated, @PriorityID, 1);
+        IF @EndDateEstimated >= GETDATE()
+        BEGIN
+            INSERT INTO subtasks (project_id, title, description, start_date, due_date, priority_id, status_id)
+            VALUES (@ProjectID, @Title, @Description, GETDATE(), @EndDateEstimated, @PriorityID, 1);
 
-        SET @NewTaskID = SCOPE_IDENTITY();
+            SET @NewTaskID = SCOPE_IDENTITY();
 
-        -- user_id = El dev asignado
-        -- assigned_id = El PM/Admin que asigna
-        INSERT INTO subtask_assignments (subtask_id, user_id, assigned_id, assignment_date)
-        VALUES (@NewTaskID, @AssignedUserID, @RealAssigner, GETDATE());
+            -- user_id = El dev asignado
+            -- assigned_id = El PM/Admin que asigna
+            INSERT INTO subtask_assignments (subtask_id, user_id, assigned_id, assignment_date)
+            VALUES (@NewTaskID, @AssignedUserID, @RealAssigner, GETDATE());
+        END
+        ELSE
+        BEGIN
+            RAISERROR('La fecha estimada de finalizaci�n no puede ser anterior a la fecha actual.', 16, 1);
+        END
 
         COMMIT TRANSACTION;
     END TRY
@@ -63,17 +70,24 @@ BEGIN
 
     BEGIN TRANSACTION;
     BEGIN TRY
-        -- A. Insertar Proyecto
-        INSERT INTO projects (name, description, priority_id, status_id, start_date, end_date_estimated, created_by)
-        VALUES (@Title, @Description, @PriorityID, 1, GETDATE(), @EndDateEstimated, @RealCreator);
+        IF @EndDateEstimated >= GETDATE()
+        BEGIN
+             -- A. Insertar Proyecto
+            INSERT INTO projects (name, description, priority_id, status_id, start_date, end_date_estimated, created_by)
+            VALUES (@Title, @Description, @PriorityID, 1, GETDATE(), @EndDateEstimated, @RealCreator);
 
-        SET @NewProjectID = SCOPE_IDENTITY();
+            SET @NewProjectID = SCOPE_IDENTITY();
 
-        -- B. Asignar Miembro
-        -- user_id = @AssignedUserID (El PM)
-        -- assigned_id = @RealCreator (El que creó el proyecto)
-        INSERT INTO project_members (project_id, user_id, assigned_id, assignment_date)
-        VALUES (@NewProjectID, @AssignedUserID, @RealCreator, GETDATE());
+            -- B. Asignar Miembro
+            -- user_id = @AssignedUserID (El PM)
+            -- assigned_id = @RealCreator (El que creó el proyecto)
+            INSERT INTO project_members (project_id, user_id, assigned_id, assignment_date)
+            VALUES (@NewProjectID, @AssignedUserID, @RealCreator, GETDATE());
+        END
+        ELSE
+        BEGIN
+            RAISERROR('La fecha estimada de finalizaci�n no puede ser anterior a la fecha actual.', 16, 1);
+        END
 
         COMMIT TRANSACTION;
     END TRY
@@ -87,7 +101,7 @@ GO
 
 -- SP 3: Completar Tarea
 -- Justificaci�n: Simplifica el cierre de tareas actualizando estado.
-CREATE OR ALTER PROCEDURE sp_CompleteTask
+/*CREATE OR ALTER PROCEDURE sp_CompleteTask
     @TaskID INT
 AS
 BEGIN
@@ -95,7 +109,7 @@ BEGIN
     SET status_id = (SELECT id FROM statuses WHERE name = 'Finalizado')
     WHERE id = @TaskID;
 END;
-GO
+GO*/
 
 -- SP 4: Crear un nuevo usuario
 -- Justificaci�n: Encapsula la l�gica de negocio (crear usuarios).
@@ -144,5 +158,90 @@ BEGIN
     UPDATE subtasks 
     SET status_id = @NewStatusID
     WHERE id = @TaskID;
+END;
+GO
+
+-- SP 5: Mover Projecto a otro estado
+-- Justificaci�n: Facilita la actualizaci�n del estado de una tarea.
+CREATE OR ALTER PROCEDURE sp_MoveProject
+    @ProjectID INT,
+    @NewStatusID INT,
+    @UserID INT,      -- Usuario que ejecuta (para auditoría)
+    @Confirm BIT = 0  -- 0: Verificar Tareas / 1: Forzar Cierre
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- 0. Contexto de Auditoría
+    EXEC sp_set_session_context 'UserID', @UserID;
+
+    DECLARE @FinalizedID INT;
+    DECLARE @CanceledID INT;
+    DECLARE @OpenTasksCount INT;
+    DECLARE @ErrorMsg NVARCHAR(200);
+
+    -- Obtener IDs de estados clave
+    SELECT @FinalizedID = id FROM statuses WHERE name = 'Finalizado';
+    SELECT @CanceledID = id FROM statuses WHERE name = 'Cancelado';
+
+    -- 1. Validaciones (Solo si intentamos finalizar y no está confirmado)
+    IF @NewStatusID = @FinalizedID AND @Confirm = 0
+    BEGIN
+        -- Contar tareas que NO están ni finalizadas ni canceladas
+        SELECT @OpenTasksCount = COUNT(*)
+        FROM subtasks
+        WHERE project_id = @ProjectID 
+          AND status_id NOT IN (@FinalizedID, @CanceledID);
+
+        IF @OpenTasksCount > 0
+        BEGIN
+            SET @ErrorMsg = CONCAT('ADVERTENCIA: El proyecto tiene ', @OpenTasksCount, 
+                                   ' tareas pendientes. Si continúa, se cerrarán automáticamente. Ejecute con @Confirm=1 para proceder.');
+            THROW 51000, @ErrorMsg, 1;
+        END
+    END
+
+    -- 2. Ejecución
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        
+        -- A. Lógica de Cierre Automático de Tareas (Si es cierre confirmado)
+        IF @NewStatusID = @FinalizedID AND @Confirm = 1
+        BEGIN
+            DECLARE @TasksAffected INT;
+            
+            -- Contamos antes de actualizar para el log
+            SELECT @TasksAffected = COUNT(*)
+            FROM subtasks
+            WHERE project_id = @ProjectID AND status_id NOT IN (@FinalizedID, @CanceledID);
+
+            IF @TasksAffected > 0
+            BEGIN
+                -- 1. Registro explícito en Auditoría (Tu requerimiento)
+                -- Esto deja constancia de que el cierre no fue "limpio", sino forzado.
+                INSERT INTO audit_logs (table_name, action_type, record_id, real_user_id, changes_summary)
+                VALUES ('projects', 'CASCADE_CLOSE', @ProjectID, @UserID, 
+                        CONCAT('El proyecto se finalizó forzando el cierre automático de ', @TasksAffected, ' tareas pendientes.'));
+
+                -- 2. Cerrar las tareas
+                -- Esto disparará individualmente el trigger de subtasks para cada una
+                UPDATE subtasks
+                SET status_id = @FinalizedID
+                WHERE project_id = @ProjectID 
+                  AND status_id NOT IN (@FinalizedID, @CanceledID);
+            END
+        END
+
+        -- B. Mover el Proyecto (Dispara Trigger trg_Audit_Projects)
+        UPDATE projects 
+        SET status_id = @NewStatusID
+        WHERE id = @ProjectID;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
 END;
 GO
