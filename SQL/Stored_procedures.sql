@@ -1,5 +1,5 @@
 -- =============================================
--- 4. PROCEDIMIENTOS ALMACENADOS (STORED PROCEDURES)
+-- PROCEDIMIENTOS ALMACENADOS (STORED PROCEDURES)
 -- =============================================
 USE TanoSQL_Vigilancia24;
 GO
@@ -98,20 +98,7 @@ BEGIN
 END;
 GO
 
-
--- SP 3: Completar Tarea
--- Justificaci�n: Simplifica el cierre de tareas actualizando estado.
-/*CREATE OR ALTER PROCEDURE sp_CompleteTask
-    @TaskID INT
-AS
-BEGIN
-    UPDATE subtasks
-    SET status_id = (SELECT id FROM statuses WHERE name = 'Finalizado')
-    WHERE id = @TaskID;
-END;
-GO*/
-
--- SP 4: Crear un nuevo usuario
+-- SP 3: Crear un nuevo usuario
 -- Justificaci�n: Encapsula la l�gica de negocio (crear usuarios).
 CREATE OR ALTER PROCEDURE sp_CreateUser
     @Name NVARCHAR(100),
@@ -143,7 +130,7 @@ BEGIN
 END;
 GO
 
--- SP 5: Mover Tarea a otro estado
+-- SP 4: Mover Tarea a otro estado
 -- Justificaci�n: Facilita la actualizaci�n del estado de una tarea.
 CREATE OR ALTER PROCEDURE sp_MoveTask
     @TaskID INT,

@@ -1,5 +1,5 @@
 -- =============================================
--- 2. MOCK DATA (DATOS DE PRUEBA)
+-- MOCK DATA (DATOS DE PRUEBA)
 -- =============================================
 USE TanoSQL_Vigilancia24;
 GO

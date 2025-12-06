@@ -1,5 +1,5 @@
 -- =============================================
--- 3. VISTAS (VIEWS) PARA REPORTES
+-- VISTAS (VIEWS) PARA REPORTES
 -- =============================================
 USE TanoSQL_Vigilancia24;
 GO
@@ -65,20 +65,10 @@ SELECT
     u.created_at AS Fecha_Creacion
 FROM users u
 JOIN user_profiles up ON u.profile_id = up.id;
-GO  
-
-/*USE TanoSQL_Vigilancia24;
 GO
 
--- 1. Asegurar que exista el estado 'Cancelado' para la lógica visual roja
-IF NOT EXISTS (SELECT * FROM statuses WHERE name = 'Cancelado')
-BEGIN
-    INSERT INTO statuses (name) VALUES ('Cancelado');
-END
-GO*/
-
 -- 5. VISTA PARA EL TABLERO (Proyectos)
--- Muestra la info del proyecto y un resumen de progreso calculado al vuelo
+-- Muestra la info del proyecto y un resumen de progreso calculado
 CREATE OR ALTER VIEW vw_Kanban_Projects AS
 SELECT 
     p.id AS ProjectID,

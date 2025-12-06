@@ -36,13 +36,13 @@ CREATE TABLE users (
 );
 
 
--- Tablas Param�tricas (Lookups)
+-- Tabla de Prioridades
 CREATE TABLE priorities (
     id INT IDENTITY(1,1) PRIMARY KEY,
     name NVARCHAR(50) NOT NULL -- Alta, Media, Baja
 );
 
-
+-- Tabla de Estados
 CREATE TABLE statuses (
     id INT IDENTITY(1,1) PRIMARY KEY,
     name NVARCHAR(50) NOT NULL -- Nuevo, En Progreso, Finalizado
@@ -81,7 +81,7 @@ CREATE TABLE project_members (
 GO
 
 
--- Tabla de Subtareas / Tickets
+-- Tabla de Subtareas / Tareas
 CREATE TABLE subtasks (
     id INT IDENTITY(1,1) PRIMARY KEY,
     project_id INT NOT NULL,

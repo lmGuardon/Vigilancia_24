@@ -2,7 +2,7 @@ USE TanoSQL_Vigilancia24;
 GO
 
 -- =============================================
--- 1. ELIMINAR TAREA (Simple)
+-- ELIMINAR TAREA (Simple)
 -- =============================================
 CREATE OR ALTER PROCEDURE sp_DeleteTask
     @TaskID INT,
@@ -62,7 +62,7 @@ END;
 GO
 
 -- =============================================
--- 2. ELIMINAR PROYECTO (Con Lógica de Advertencia)
+-- ELIMINAR PROYECTO (Con Lógica de Advertencia)
 -- =============================================
 CREATE OR ALTER PROCEDURE sp_DeleteProject
     @ProjectID INT,
@@ -130,7 +130,7 @@ END;
 GO
 
 -- =============================================
--- 3. ELIMINAR USUARIO (Con Lógica de Advertencia y Reasignación)
+-- ELIMINAR USUARIO (Con Lógica de Advertencia y Reasignación)
 -- =============================================
 CREATE OR ALTER PROCEDURE sp_DeleteUser
     @TargetUserID INT,         -- Usuario a eliminar
