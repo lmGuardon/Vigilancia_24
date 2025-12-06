@@ -132,3 +132,108 @@ FROM audit_logs al
 LEFT JOIN users u ON al.real_user_id = u.id;
 GO
 
+-- =========================================================================
+-- VISTA 1: Reporte Detallado de Proyectos y sus Tareas
+-- Objetivo: Ver la estructura completa de un proyecto.
+-- Uso: SELECT * FROM vw_Report_Project_Tasks WHERE Proyecto = 'Migración SQL';
+-- =========================================================================
+CREATE OR ALTER VIEW vw_Report_Project_Tasks AS
+SELECT 
+    p.id AS ProjectID,
+    p.name AS Proyecto,
+    p.description AS Desc_Proyecto,
+    sp.name AS Estado_Proyecto,
+    
+    -- Información de la Tarea
+    t.id AS TaskID,
+    t.title AS Tarea,
+    t.description AS Desc_Tarea,
+    st.name AS Estado_Tarea,
+    pt.name AS Prioridad_Tarea,
+    t.due_date AS Vencimiento,
+    
+    -- Calculamos si está vencida (1 = Sí, 0 = No)
+    CASE 
+        WHEN t.due_date < GETDATE() AND st.name NOT IN ('Finalizado', 'Cancelado') THEN 1 
+        ELSE 0 
+    END AS Esta_Vencida,
+
+    -- Concatenamos los responsables de la tarea en una sola celda (Ej: "Juan, Pedro")
+    (SELECT STRING_AGG(u.name, ', ') 
+     FROM subtask_assignments sa 
+     JOIN users u ON sa.user_id = u.id 
+     WHERE sa.subtask_id = t.id) AS Responsables_Tarea
+
+FROM projects p
+-- Usamos LEFT JOIN para mostrar el proyecto aunque NO tenga tareas aún
+LEFT JOIN subtasks t ON p.id = t.project_id
+LEFT JOIN statuses sp ON p.status_id = sp.id
+LEFT JOIN statuses st ON t.status_id = st.id
+LEFT JOIN priorities pt ON t.priority_id = pt.id;
+GO
+
+-- =========================================================================
+-- VISTA 2: Reporte de Tareas Asignadas por Usuario
+-- Objetivo: Ver la carga de trabajo individual.
+-- Uso: SELECT * FROM vw_Report_User_Tasks WHERE Usuario = 'Lucas Guardon';
+-- =========================================================================
+CREATE OR ALTER VIEW vw_Report_User_Tasks AS
+SELECT 
+    u.id AS UserID,
+    u.name AS Usuario,
+    u.email AS Email,
+    up.role_name AS Perfil,
+    
+    -- Detalles de la Tarea Asignada
+    t.id AS TaskID,
+    t.title AS Tarea,
+    p.name AS Proyecto_Relacionado,
+    st.name AS Estado_Tarea,
+    pr.name AS Prioridad,
+    t.due_date AS Vencimiento,
+    
+    -- Quién le asignó esta tarea y cuándo
+    u_assigner.name AS Asignado_Por,
+    sa.assignment_date AS Fecha_Asignacion
+
+FROM users u
+JOIN user_profiles up ON u.profile_id = up.id
+JOIN subtask_assignments sa ON u.id = sa.user_id
+JOIN subtasks t ON sa.subtask_id = t.id
+JOIN projects p ON t.project_id = p.id
+JOIN statuses st ON t.status_id = st.id
+JOIN priorities pr ON t.priority_id = pr.id
+LEFT JOIN users u_assigner ON sa.assigned_id = u_assigner.id;
+GO
+
+-- =========================================================================
+-- VISTA 3: Reporte de Proyectos Asignados por Usuario
+-- Objetivo: Ver en qué proyectos participa un usuario.
+-- Uso: SELECT * FROM vw_Report_User_Projects WHERE Usuario = 'Maximiliano Juarez';
+-- =========================================================================
+CREATE OR ALTER VIEW vw_Report_User_Projects AS
+SELECT 
+    u.id AS UserID,
+    u.name AS Usuario,
+    up.role_name AS Perfil,
+    
+    -- Detalles del Proyecto donde es Miembro
+    p.id AS ProjectID,
+    p.name AS Proyecto,
+    p.description AS Descripcion,
+    sp.name AS Estado_Proyecto,
+    pp.name AS Prioridad_Proyecto,
+    p.end_date_estimated AS Fin_Estimado,
+    
+    -- Datos de la asignación
+    u_assigner.name AS Asignado_Al_Proyecto_Por,
+    pm.assignment_date AS Fecha_Alta_Proyecto
+
+FROM users u
+JOIN user_profiles up ON u.profile_id = up.id
+JOIN project_members pm ON u.id = pm.user_id
+JOIN projects p ON pm.project_id = p.id
+JOIN statuses sp ON p.status_id = sp.id
+JOIN priorities pp ON p.priority_id = pp.id
+LEFT JOIN users u_assigner ON pm.assigned_id = u_assigner.id;
+GO

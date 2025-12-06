@@ -1,54 +1,152 @@
+<<<<<<< HEAD
 -- =============================================
 -- MOCK DATA (DATOS DE PRUEBA)
 -- =============================================
 USE TanoSQL_Vigilancia24;
+=======
+-- ==================================================================================
+-- SCRIPT DE GENERACI脫N DE DATOS MOCK (MASIVO Y ROBUSTO)
+-- ==================================================================================
+-- NOTA: Este script borra los datos existentes para empezar limpio.
+
+SET NOCOUNT ON;
+
+PRINT '1. Limpiando datos existentes...';
+-- Deshabilitar constraints temporalmente para limpieza r谩pida
+EXEC sp_MSforeachtable "ALTER TABLE ? NOCHECK CONSTRAINT all";
+
+DELETE FROM audit_logs;
+DELETE FROM subtask_assignments;
+DELETE FROM subtasks;
+DELETE FROM project_members;
+DELETE FROM projects;
+DELETE FROM users;
+DELETE FROM statuses;
+DELETE FROM priorities;
+DELETE FROM user_profiles;
+
+-- Habilitar constraints nuevamente
+EXEC sp_MSforeachtable "ALTER TABLE ? WITH CHECK CHECK CONSTRAINT all";
+DBCC CHECKIDENT ('audit_logs', RESEED, 0); -- Reiniciar contadores de ID
+DBCC CHECKIDENT ('subtasks', RESEED, 0);
+DBCC CHECKIDENT ('projects', RESEED, 0);
+DBCC CHECKIDENT ('users', RESEED, 0);
+DBCC CHECKIDENT ('statuses', RESEED, 0);
+DBCC CHECKIDENT ('priorities', RESEED, 0);
+DBCC CHECKIDENT ('user_profiles', RESEED, 0);
+>>>>>>> c6f5bfc9652eb40c296eb3246a09b114de14c314
 GO
 
--- Insertar Perfiles
+
+PRINT '2. Insertando Datos Param茅tricos...';
+-- Perfiles
 INSERT INTO user_profiles (role_name, description) VALUES 
-('Administrador', 'Acceso total al sistema'),
-('Project Manager', 'Gesti髇 de proyectos y reportes'),
-('Desarrollador', 'Ejecuci髇 de tareas t閏nicas');
+('Administrador', 'Control total y auditor铆a'),
+('Project Manager', 'Gesti贸n de equipos y proyectos'),
+('Desarrollador', 'Ejecuci贸n t茅cnica');
 
+-- Prioridades
+INSERT INTO priorities (name) VALUES ('Baja'), ('Media'), ('Alta'), ('Cr铆tica');
 
--- Insertar Prioridades
-INSERT INTO priorities (name) VALUES ('Baja'), ('Media'), ('Alta'), ('Cr韙ica');
-
-
--- Insertar Estados
+-- Estados (Incluye Cancelado como pediste)
 INSERT INTO statuses (name) VALUES ('Pendiente'), ('En Progreso'), ('QA / Testing'), ('Finalizado'), ('Cancelado');
 
 
--- Insertar Usuarios (Basado en el PDF)
+PRINT '3. Generando Usuarios...';
+-- 3 Usuarios Base (Los que usas para Login)
 INSERT INTO users (name, email, password_hash, profile_id) VALUES 
-('Maximiliano Juarez', 'mjuarez@vigilancia24.com', 'hash123', 1), -- Admin
-('Lucas Guardon', 'lguardon@vigilancia24.com', 'hash456', 2), -- PM
-('Dev Junior', 'dev1@vigilancia24.com', 'hash789', 3); -- Dev
+('Maximiliano Juarez', 'mjuarez@vigilancia24.com', 'hash123', 1), -- ID 1: Admin
+('Lucas Guardon', 'lguardon@vigilancia24.com', 'hash456', 2),    -- ID 2: PM
+('Dev Junior', 'dev1@vigilancia24.com', 'hash789', 3);          -- ID 3: Dev
+
+-- 5 Usuarios Extra (Generados para tener equipo)
+INSERT INTO users (name, email, password_hash, profile_id) VALUES 
+('Ana Backend', 'ana@vigilancia24.com', 'hash_ana', 3),
+('Carlos Frontend', 'carlos@vigilancia24.com', 'hash_carlos', 3),
+('Sofia QA', 'sofia@vigilancia24.com', 'hash_sofia', 3),
+('Pedro DevOps', 'pedro@vigilancia24.com', 'hash_pedro', 3),
+('Laura TechLead', 'laura@vigilancia24.com', 'hash_laura', 2); -- Otro PM
 
 
--- Insertar Proyectos
-INSERT INTO projects (name, description, start_date, end_date_estimated, created_by, status_id, priority_id) VALUES 
-('Migraci髇 SQL Server 2025', 'Actualizaci髇 del motor de base de datos central.', '2025-10-01', '2025-12-01', 1, 2, 4),
-('App Gesti髇 de Horarios', 'Nueva app interna para RRHH.', '2025-11-15', '2026-02-20', 2, 1, 3),
-('Limpieza DB Soft', 'Mantenimiento trimestral de la DB del Soft de monitoreo.', '2025-11-25', '2025-11-26', 1, 1, 3),
-('Telefonia IP', 'Actualizaci髇 de servidores para telefonia IP.', '2025-11-15', '2026-01-15', 2, 1, 2);
+PRINT '4. Generando 10 Proyectos...';
+DECLARE @i INT = 1;
+DECLARE @AdminID INT = 1; -- Maximiliano
+DECLARE @PMID INT = 2;    -- Lucas
+
+WHILE @i <= 10
+BEGIN
+    -- Alternar Creador entre Admin y PM
+    DECLARE @CreatorID INT = CASE WHEN @i % 2 = 0 THEN @PMID ELSE @AdminID END;
+    
+    -- Insertar Proyecto
+    INSERT INTO projects (name, description, start_date, end_date_estimated, created_by, status_id, priority_id)
+    VALUES (
+        CONCAT('Proyecto ', @i, ': Sistema ', CHAR(64+@i)), -- Nombres tipo "Sistema A, B..."
+        'Proyecto generado autom谩ticamente para pruebas de carga y dashboard.',
+        GETDATE(),
+        DATEADD(DAY, 30 + (@i*5), GETDATE()), -- Fecha fin variable
+        @CreatorID, -- created_by (Requisito nuevo)
+        CASE WHEN @i > 8 THEN 4 ELSE 2 END, -- Algunos finalizados (4), otros en progreso (2)
+        (@i % 4) + 1 -- Prioridad rotativa
+    );
+
+    DECLARE @NewProjID INT = SCOPE_IDENTITY();
+
+    -- Asignar L铆der al Proyecto (En project_members)
+    -- Asignamos al creador como miembro tambi茅n
+    INSERT INTO project_members (project_id, user_id, assigned_id, assignment_date)
+    VALUES (@NewProjID, @CreatorID, @AdminID, GETDATE());
+
+    -- Asignar un Dev aleatorio al proyecto (ID 3 a 8)
+    DECLARE @RandomDev INT = 3 + (@i % 5); 
+    INSERT INTO project_members (project_id, user_id, assigned_id, assignment_date)
+    VALUES (@NewProjID, @RandomDev, @CreatorID, GETDATE());
+
+    SET @i = @i + 1;
+END;
 
 
--- Asignar miembros al proyecto de Migraci髇
-INSERT INTO project_members (project_id, user_id) VALUES (1, 1), (1, 3),(2,2),(2,1),(3,1),(3,2),(3,3);
+PRINT '5. Generando 30 Tareas...';
+SET @i = 1;
+WHILE @i <= 30
+BEGIN
+    -- Seleccionar un proyecto al azar (IDs 1 a 10)
+    -- F贸rmula: FLOOR(RAND()*(Max-Min+1)+Min)
+    DECLARE @RndProject INT = FLOOR(RAND()*(10-1+1)+1);
+    
+    -- Seleccionar Prioridad y Estado al azar
+    DECLARE @RndPriority INT = FLOOR(RAND()*(4-1+1)+1);
+    DECLARE @RndStatus INT = FLOOR(RAND()*(5-1+1)+1); -- 1 a 5 (incluye cancelado)
 
+    INSERT INTO subtasks (project_id, title, description, start_date, due_date, priority_id, status_id)
+    VALUES (
+        @RndProject,
+        CONCAT('Ticket #', @i, ' - Requerimiento funcional'),
+        'Descripci贸n gen茅rica de la tarea para pruebas de volumen.',
+        GETDATE(),
+        DATEADD(DAY, @i, GETDATE()), -- Vencimiento escalonado
+        @RndPriority,
+        @RndStatus
+    );
 
--- Insertar Tareas (Subtasks)
-INSERT INTO subtasks (project_id, title, description, start_date, due_date, priority_id, status_id) VALUES 
-(1, 'Backup Full Inicial', 'Realizar backup completo antes de migrar.', '2025-10-02', '2025-10-03', 4, 4), -- Finalizada
-(1, 'Instalaci髇 Instancia', 'Instalar nueva instancia en server paralelo.', '2025-10-05', '2025-10-10', 3, 2), -- En Progreso
-(2, 'Dise駉 de Mockups', 'Dise馻r pantallas de login.', '2025-11-20', '2025-11-25', 2, 1), -- Pendiente
-(3, 'Simulacro limpieza', 'Relizar un simulacro de la limpieza agendandos tiempos de cada paso.', '2025-11-25', '2025-11-25', 1, 2), -- En Progreso
-(4, 'Compra de servidores', 'Relizar pedido de los servers con sus correspondientes partes.', '2025-10-01', '2025-11-01', 2, 4); -- Finalizado
+    DECLARE @NewTaskID INT = SCOPE_IDENTITY();
 
+    -- Asignar la tarea a un usuario (Del 1 al 8)
+    DECLARE @RndUser INT = FLOOR(RAND()*(8-1+1)+1);
+    
+    -- Insertar Asignaci贸n (Respetando assigned_id)
+    INSERT INTO subtask_assignments (subtask_id, user_id, assigned_id, assignment_date)
+    VALUES (
+        @NewTaskID, 
+        @RndUser, -- Usuario que hace la tarea
+        1,        -- assigned_id (Digamos que el Admin asign贸 todo masivamente)
+        GETDATE()
+    );
 
--- Asignar tareas
-INSERT INTO subtask_assignments (subtask_id, user_id) VALUES (1, 1), (2, 3),(5,3),(4,2);
+    SET @i = @i + 1;
+END;
+
+PRINT '=======================================';
+PRINT '   CARGA DE DATOS FINALIZADA EXITOSAMENTE';
+PRINT '=======================================';
 GO
-
-
